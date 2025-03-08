@@ -48,7 +48,7 @@ class ExperimentPlayer:
             self.screen.fill((0, 0, 0))
 
             # Show prompts
-            prompt = font.render("Enter Participant ID:", True, (255, 255, 255))
+            prompt = font.render("Enter Session ID:", True, (255, 255, 255))
             text_surface = font.render(input_text, True, (255, 255, 255))
             instruction = font.render("Press ENTER when done", True, (255, 255, 255))
 
