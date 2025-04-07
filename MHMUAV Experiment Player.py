@@ -35,8 +35,18 @@ class ExperimentPlayer:
         ]
 
     def _setup_lsl(self):
-        """Setup LSL stream for markers."""
-        info = StreamInfo('VideoMarkers', 'Markers', 1, 0, 'int32', 'uniqueMarkerID12345')
+        """Setup LSL stream for markers with wall clock time."""
+        # Import the specific constants from pylsl
+        from pylsl import cf_double64
+
+        # Configure stream to match EmotiBit's expected parameters exactly
+        # Name: 'DataSyncMarker', sourceId: '12345'
+        info = StreamInfo('DataSyncMarker', 'Markers', 2, 0, cf_double64, '12345')
+
+        # Add additional metadata if needed
+        info_desc = info.desc()
+        info_desc.append_child_value("manufacturer", "Custom")
+
         return StreamOutlet(info)
 
     def get_participant_id(self):
@@ -93,8 +103,8 @@ class ExperimentPlayer:
             fps = cap.get(cv.CAP_PROP_FPS)
             frame_time = 1 / fps
 
-            # Send start marker
-            self.outlet.push_sample([1])
+            # Send start marker with wall clock time
+            self.outlet.push_sample([1, time.time()])
 
             clock = pygame.time.Clock()
             last_frame_time = time.time()
@@ -127,8 +137,8 @@ class ExperimentPlayer:
                 # Control frame rate
                 clock.tick(fps)
 
-            # Send end marker
-            self.outlet.push_sample([2])
+            # Send end marker with wall clock time
+            self.outlet.push_sample([2, time.time()])
             cap.release()
 
             self.screen.fill((0, 0, 0))
