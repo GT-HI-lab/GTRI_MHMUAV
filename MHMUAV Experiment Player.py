@@ -40,12 +40,24 @@ class ExperimentPlayer:
         from pylsl import cf_double64
 
         # Configure stream to match EmotiBit's expected parameters exactly
-        # Name: 'DataSyncMarker', sourceId: '12345'
+        # Keep the name as 'DataSyncMarker'
         info = StreamInfo('DataSyncMarker', 'Markers', 2, 0, cf_double64, '12345')
 
-        # Add additional metadata if needed
+        # Add additional metadata including created_at timestamp
         info_desc = info.desc()
         info_desc.append_child_value("manufacturer", "Custom")
+
+        # Add created_at timestamp to the stream info to help with wall clock time conversion
+        import time
+        current_time = time.time()
+        info_desc.append_child_value("created_at", str(current_time))
+
+        # Print confirmation of stream setup
+        print(f"LSL Marker Stream Setup:")
+        print(f"  Name: DataSyncMarker")
+        print(f"  Type: Markers")
+        print(f"  Channels: 2")
+        print(f"  created_at: {current_time}")
 
         return StreamOutlet(info)
 
@@ -104,7 +116,9 @@ class ExperimentPlayer:
             frame_time = 1 / fps
 
             # Send start marker with wall clock time
-            self.outlet.push_sample([1, time.time()])
+            current_time = time.time()
+            self.outlet.push_sample([1, current_time])
+            print(f"Sent video start marker with timestamp: {current_time}")
 
             clock = pygame.time.Clock()
             last_frame_time = time.time()
@@ -138,7 +152,10 @@ class ExperimentPlayer:
                 clock.tick(fps)
 
             # Send end marker with wall clock time
-            self.outlet.push_sample([2, time.time()])
+            current_time = time.time()
+            self.outlet.push_sample([2, current_time])
+            print(f"Sent video end marker with timestamp: {current_time}")
+
             cap.release()
 
             self.screen.fill((0, 0, 0))
