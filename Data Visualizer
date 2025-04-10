@@ -1,0 +1,246 @@
+#%%
+#Stream analysis
+import pyxdf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+#%%
+# Load the XDF file
+file_path = "/Users/debbiehsu/Downloads/4_10_test3.xdf"  # Replace with your actual file path
+streams, header = pyxdf.load_xdf(file_path)
+
+#%%
+# Identify marker streams and audio stream
+marker_streams = []
+audio_stream = None
+
+for stream in streams:
+    stream_type = stream['info']['type'][0].lower()
+    
+    if "marker" in stream_type or "keyboard" in stream_type:  
+        marker_streams.append(stream)  # Store all marker streams
+    elif "audio" in stream_type:
+        audio_stream = stream  # Store audio stream
+#%%
+# Function to extract marker timestamps and labels
+def extract_markers(marker_stream):
+    timestamps = marker_stream['time_stamps']
+    labels = [m[0] for m in marker_stream['time_series']]  # Extract marker labels
+    return timestamps, labels, marker_stream['info']['name'][0]  # Include stream name
+
+# Extract markers with stream names
+marker_data = [extract_markers(ms) for ms in marker_streams]
+
+#%%
+#Check streams
+for idx, stream in enumerate(streams):
+    print(f"Stream Index: {idx}")
+    print(f"Source ID: {stream['info'].get('source_id', ['Unknown'])[0]}")
+    print(f"Stream Name: {stream['info']['name'][0]}")
+    print(f"Channel Count: {stream['info']['channel_count'][0]}")
+    print(f"Sampling Rate: {stream['info']['nominal_srate'][0]} Hz\n")
+    
+#%%
+# Define unique colors and styles for marker streams
+marker_styles = [
+    ('red', 'dashed'), ('blue', 'solid')
+]
+while len(marker_styles) < len(marker_data):  # Ensure enough colors 
+    marker_styles.append(('black', 'dotted'))  
+#%%
+# Visualize all streams with distinct markers
+for idx, stream in enumerate(streams):
+    # Extract data and timestamps for the current stream
+    stream_name = stream['info']['name'][0]
+    stream_type = stream['info']['type'][0]
+    data = stream['time_series']
+    timestamps = stream['time_stamps']
+    
+    # Check if timestamps are empty
+    if len(timestamps) == 0:
+        print(f"Warning: Stream '{stream_name}' has no timestamps. Skipping...")
+        continue
+    
+    # Convert timestamps to relative time (starting at 0)
+    relative_timestamps = [t - timestamps[0] for t in timestamps]
+
+    # Check if this is a marker stream
+    is_marker_stream = stream_name in [m[2] for m in marker_data]
+    
+    # If it's a marker stream, visualize it directly
+    if is_marker_stream:
+        # Find the corresponding marker data
+        for i, (marker_timestamps, marker_labels, marker_name) in enumerate(marker_data):
+            if marker_name == stream_name:
+                marker_color, marker_style = marker_styles[i] if i < len(marker_styles) else ('red', 'solid')
+                
+                # Create a dedicated figure for this marker stream
+                plt.figure(figsize=(20, 6))
+                
+                # Convert marker timestamps to relative time
+                marker_times = [t - timestamps[0] for t in marker_timestamps]
+                
+                # Create visualization for marker stream
+                plt.vlines(marker_times, ymin=0, ymax=1, color=marker_color, 
+                           linestyles=marker_style, label=f'Markers - {marker_name}')
+                
+                # Add marker labels
+                for i, (ts, label) in enumerate(zip(marker_times, marker_labels)):
+                    plt.text(ts, 1.05, label, rotation=90, fontsize=9, verticalalignment='bottom')
+                
+                plt.title(f"Marker Stream: {marker_name} ({stream_type})")
+                plt.xlabel("Relative Time (seconds)")
+                plt.ylabel("Events")
+                plt.ylim(0, 1.2)
+                plt.legend()
+                plt.grid()
+                plt.xticks(rotation=45)
+                plt.show()
+                break
+        
+        # Continue to the next stream after visualizing the marker
+        continue
+
+    # Handle audio stream separately
+    if stream == audio_stream:
+        if len(data) == 0:
+            print(f"Warning: Audio stream '{stream_name}' has no data. Skipping...")
+            continue
+            
+        plt.figure(figsize=(20, 6))
+        audio_waveform = np.array(data).flatten()
+
+        # Display audio waveform
+        plt.plot(relative_timestamps, audio_waveform, color='purple', label="Audio Signal")
+        plt.title(f"Audio Stream: {stream_name}")
+        plt.xlabel("Relative Time (seconds)")
+        plt.ylabel("Amplitude")
+        plt.grid()
+
+        # Add markers
+        if marker_data: 
+            for (marker_timestamps, marker_labels, marker_name), (color, style) in zip(marker_data, marker_styles): 
+                marker_times = [t - timestamps[0] for t in marker_timestamps]
+                plt.vlines(marker_times, ymin=min(audio_waveform), ymax=max(audio_waveform), 
+                          color=color, linestyles=style, label=f'Markers - {marker_name}')
+        
+        plt.legend()
+        plt.xticks(rotation=45)
+        plt.show()
+        continue
+
+    # Handle list-based (categorical) data
+    if isinstance(data, list):
+        if len(data) == 0:
+            print(f"Warning: Categorical stream '{stream_name}' has no data. Skipping...")
+            continue
+            
+        df = pd.DataFrame({
+            "Relative Time": relative_timestamps,
+            "Events": [d[0] if isinstance(d, list) else d for d in data]
+        })
+
+        plt.figure(figsize=(20, 6))
+        plt.vlines(df['Relative Time'], ymin=0, ymax=1, color='blue', linestyles='solid', label='Events')
+
+        # Annotate events
+        for _, row in df.iterrows():
+            plt.text(row['Relative Time'], 1.05, row['Events'], rotation=90, fontsize=9, verticalalignment='bottom')
+
+        plt.title(f"Stream {idx + 1}: {stream_name} ({stream_type})")
+        plt.xlabel("Relative Time (seconds)")
+        plt.ylabel("Events")
+        plt.ylim(0, 1.2)
+        plt.legend()
+        plt.grid()
+        plt.xticks(rotation=45)
+        plt.show()
+
+    else: 
+        if not isinstance(data, np.ndarray) or data.size == 0:
+            print(f"Warning: Numerical stream '{stream_name}' has no data. Skipping...")
+            continue
+            
+        # Handle numerical (continuous) data
+        df = pd.DataFrame(data, columns=[f"Channel {i+1}" for i in range(data.shape[1])])
+        df['Relative Time'] = relative_timestamps
+
+        plt.figure(figsize=(20, 6))
+
+        # Special handling for Neon Gaze (extract pupil diameter)
+        if stream_name == "Neon Companion_Neon Gaze":
+            channel_labels = stream['info']['desc'][0]['channels'][0]['channel']
+            pupil_diameter_channels = [
+                (i, channel['label'][0]) for i, channel in enumerate(channel_labels)
+                if "diameter" in channel['type'][0].lower()
+            ]
+            
+            if pupil_diameter_channels:
+                print(f"Extracting pupil diameter from: {[ch[1] for ch in pupil_diameter_channels]}")
+                selected_indices = [ch[0] for ch in pupil_diameter_channels]
+                selected_labels = [ch[1] for ch in pupil_diameter_channels]
+            else:
+                selected_indices = range(data.shape[1])  # Default to all channels
+                selected_labels = df.columns[:-1]
+        else:
+            selected_indices = range(data.shape[1])
+            selected_labels = df.columns[:-1]
+
+        # Plot selected channels
+        for i, label in zip(selected_indices, selected_labels):
+            plt.plot(df['Relative Time'], df.iloc[:, i], label=f"{stream_name} - {label}")
+
+        # Add marker streams
+        if marker_data:
+            for (marker_timestamps, marker_labels, marker_name), (color, style) in zip(marker_data, marker_styles):
+                marker_times = [t - timestamps[0] for t in marker_timestamps]
+                plt.vlines(marker_times, ymin=df.iloc[:, :-1].min().min(), ymax=df.iloc[:, :-1].max().max(), 
+                          color=color, linestyles=style, label=f'Markers - {marker_name}')
+
+                for ts, label in zip(marker_times, marker_labels):
+                    plt.text(ts, df.iloc[:, :-1].max().max(), label, rotation=90, fontsize=8, verticalalignment='bottom')
+
+        plt.title(f"Stream {idx + 1}: {stream_name} ({stream_type}) ({stream['info'].get('source_id', ['Unknown'])[0]})")
+        plt.xlabel("Relative Time (seconds)")
+        plt.ylabel("Amplitude")
+        plt.legend(loc='upper right')
+        plt.grid()
+        plt.xticks(rotation=45)
+        plt.show()
+
+# Add a special case for when we only have marker streams and no other streams
+if all(stream['info']['name'][0] in [m[2] for m in marker_data] for stream in streams):
+    print("Only marker streams found in the file. Generating a combined marker visualization...")
+    
+    # Create a unified plot for all markers when that's all we have
+    plt.figure(figsize=(20, 6))
+    
+    # Plot each marker stream with its own color and style
+    for i, (marker_timestamps, marker_labels, marker_name) in enumerate(marker_data):
+        marker_color, marker_style = marker_styles[i] if i < len(marker_styles) else ('red', 'solid')
+        
+        # Get the first timestamp from this marker stream to make relative times
+        if marker_timestamps:
+            first_timestamp = marker_timestamps[0]
+            marker_times = [t - first_timestamp for t in marker_timestamps]
+            
+            # Position each marker stream at a different y-level
+            y_level = i + 1
+            
+            # Plot markers
+            plt.vlines(marker_times, ymin=y_level-0.4, ymax=y_level+0.4, 
+                       color=marker_color, linestyles=marker_style, label=f'{marker_name}')
+            
+            # Add labels
+            for ts, label in zip(marker_times, marker_labels):
+                plt.text(ts, y_level+0.5, label, rotation=90, fontsize=8, verticalalignment='bottom')
+    
+    plt.title("Combined Marker Streams Visualization")
+    plt.xlabel("Relative Time (seconds)")
+    plt.ylabel("Marker Streams")
+    plt.yticks([i+1 for i in range(len(marker_data))], [m[2] for m in marker_data])
+    plt.legend(loc='upper right')
+    plt.grid()
+    plt.show()
+#%%
