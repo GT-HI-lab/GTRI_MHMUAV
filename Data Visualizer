@@ -4,10 +4,9 @@ import pyxdf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
 #%%
 # Load the XDF file
-file_path = "/Users/debbiehsu/Downloads/4_10_test3.xdf"  # Replace with your actual file path
+file_path = "/Users/debbiehsu/Downloads/16_I.xdf"  # Replace with your actual file path
 streams, header = pyxdf.load_xdf(file_path)
 
 #%%
@@ -44,10 +43,10 @@ for idx, stream in enumerate(streams):
 #%%
 # Define unique colors and styles for marker streams
 marker_styles = [
-    ('red', 'dashed'), ('blue', 'solid')
+    ('red', 'dashed'), ('black', 'solid')
 ]
 while len(marker_styles) < len(marker_data):  # Ensure enough colors 
-    marker_styles.append(('black', 'dotted'))  
+    marker_styles.append(('blue', 'dotted'))  
 #%%
 # Visualize all streams with distinct markers
 for idx, stream in enumerate(streams):
