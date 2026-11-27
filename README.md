@@ -24,22 +24,6 @@ those tables.
 | Mixed (M) | 95% | 58% |
 | Low-Low (LL) | 58% | 63% |
 
-## Repository layout
-
-```
-README.md                          project overview (this file)
-feature_extraction/                raw data -> block-level feature tables in data/ (need data not in the repository)
-    01_eye_features.ipynb              Commander eye tracking per block
-    02a_conversation_sentiment.R       sentence-level sentiment with sentimentr (run before 02b)
-    02b_conversation_features.ipynb    Commander and IS conversation per block
-models/                            feature tables -> models (use data/ only)
-    01_reliability_eye_tracking.ipynb  eye tracking -> reliability condition
-    02_trust_two_stage.ipynb           eye tracking (stage 1) + conversation (stage 2) -> Commander trust
-data/                              derived, de-identified feature tables; see data/README.md
-figures/<model notebook>/          figures written by each model notebook
-requirements.txt, environment.yml  Python packages
-```
-
 Feature-extraction files are numbered in the order they run. Model notebooks are numbered in the order they build on
 each other (model 02 uses the stage-1 design from model 01). All notebooks are saved with their outputs.
 
